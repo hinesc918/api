@@ -7,10 +7,7 @@ from flask import Flask, request, jsonify
 # Inisialisasi Aplikasi Flask
 app = Flask(__name__)
 
-# Ambil API Key dari Environment Variable yang diatur di Vercel
-SECRET_KEY = os.environ.get('API_KEY', 'default-key-for-local-testing')
-
-# Kelas HotmailValidator
+# Kelas HotmailValidator (Tidak ada perubahan)
 class HotmailValidator:
     def __init__(self, email, password):
         self.session = requests.Session()
@@ -60,23 +57,26 @@ class HotmailValidator:
             return 'RETRY_ERROR'
 
 # Endpoint API Utama
-# Vercel akan mengarahkan semua permintaan ke sini
-@app.route('/', defaults={'path': ''}, methods=['POST'])
-@app.route('/<path:path>', methods=['POST'])
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
 def catch_all(path):
-    # 1. Verifikasi API Key
-    provided_key = request.headers.get('x-api-key')
-    if not provided_key or provided_key != SECRET_KEY:
-        return jsonify({"error": "Unauthorized - Invalid API Key"}), 401
+    if path != "asu":
+        return jsonify({"error": "Invalid endpoint. Use /asu"}), 404
 
-    # 2. Ambil data dari permintaan
-    data = request.get_json()
-    if not data or 'email' not in data or 'password' not in data:
-        return jsonify({"error": "Missing email or password"}), 400
+    # Ambil query string mentah (contoh: b'?=email:pass')
+    query_string = request.query_string.decode('utf-8')
+    
+    # Periksa dan ekstrak data 'email:pass'
+    if not query_string.startswith('='):
+        return jsonify({"error": "Invalid query format. Expected ?=email:pass"}), 400
+    try:
+        data_part = query_string.split('=', 1)[1]
+        email, password = data_part.split(':', 1)
+    except (IndexError, ValueError):
+        return jsonify({"error": "Invalid data format. Expected email:pass"}), 400
 
-    email, password = data['email'], data['password']
-
-    # 3. Jalankan validator dan kembalikan hasilnya
+    # Jalankan validator dan kembalikan hasilnya
     validator = HotmailValidator(email, password)
     status = validator.validate_account()
     return jsonify({"email": email, "status": status})
+
